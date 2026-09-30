@@ -1,0 +1,14 @@
+#~ KiCAD Project
+
+# General
+datasheets/
+dist/
+research/
+.meta.private
+TODO.md
+
+# KiCAD
+src/**/*-backups
+src/**/*.kicad_prl
+src/**/*.kicad_*.lck
+src/**/fp-info-cache
