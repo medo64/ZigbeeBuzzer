@@ -12,3 +12,7 @@ src/**/*-backups
 src/**/*.kicad_prl
 src/**/*.kicad_*.lck
 src/**/fp-info-cache
+hardware/**/*-backups
+hardware/**/*.kicad_prl
+hardware/**/*.kicad_*.lck
+hardware/**/fp-info-cache
