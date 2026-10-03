@@ -3035,6 +3035,19 @@
 		(layer "F.Fab")
 		(uuid "b7cc8a4f-e389-49f1-991f-aee9a34ba33a")
 	)
+	(gr_text "ZigbeeBuzzer AXXXX"
+		(at 33 33 0)
+		(layer "B.SilkS")
+		(uuid "e71be9fb-cefa-4587-ba89-5d3d26f4657f")
+		(effects
+			(font
+				(size 0.8 0.6)
+				(thickness 0.15)
+				(bold yes)
+			)
+			(justify mirror)
+		)
+	)
 	(segment
 		(start 40.62 25.52)
 		(end 38.78 25.52)
