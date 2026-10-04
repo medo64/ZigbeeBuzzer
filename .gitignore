@@ -7,7 +7,7 @@ research/
 .meta.private
 TODO.md
 
-# KiCAD
+# Hardware: KiCAD
 src/**/*-backups
 src/**/*.kicad_prl
 src/**/*.kicad_*.lck
@@ -16,3 +16,7 @@ hardware/**/*-backups
 hardware/**/*.kicad_prl
 hardware/**/*.kicad_*.lck
 hardware/**/fp-info-cache
+
+# Software: C#
+software/**/bin
+software/**/obj
