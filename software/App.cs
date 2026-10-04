@@ -1,6 +1,9 @@
 ﻿namespace ToneTest;
 
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
 
 internal class App {
 
@@ -9,53 +12,28 @@ internal class App {
     public const int C5 = 523, D5 = 587, DS5 = 622, E5 = 659, F5 = 698, G5 = 784, A5 = 880, B5 = 988;
 
     internal static void Main(string[] args) {
-        using var buzzer = new Buzzer();
+        if (args.Length == 0) { args = ["FurElise.tones"]; }
 
-        // buzzer.PlayNote("D5", 60);
-        // buzzer.PlayNote("F5", 60);
-        // buzzer.PlayNote("A5", 90);
-        // buzzer.PlayNote("D6", 140);
+        var buzzer = new Buzzer();
+        foreach (var file in args) {
+            if (!File.Exists(file)) { throw new InvalidOperationException($"File not found ({file})"); }
 
-        buzzer.PlayNote("E5", 250);
-        buzzer.PlayNote("d5", 250);
-        buzzer.PlayNote("E5", 250);
-        buzzer.PlayNote("d5", 250);
-        buzzer.PlayNote("E5", 250);
-        buzzer.PlayNote("B4", 250);
-        buzzer.PlayNote("D5", 250);
-        buzzer.PlayNote("C5", 250);
-        buzzer.PlayNote("A4", 500);
+            var chars = new List<char>();
+            foreach (var ch in File.ReadAllText(file)) {
+                if (!char.IsWhiteSpace(ch)) { chars.Add(ch); }
+            }
 
-        buzzer.PlayNote("C4", 250);
-        buzzer.PlayNote("E4", 250);
-        buzzer.PlayNote("A4", 250);
-        buzzer.PlayNote("B4", 500);
+            if (chars.Count % 3 != 0) { throw new InvalidDataException("Invalid tone count"); }
+            for (var i = 0; i < chars.Count; i += 3) {
+                var noteChar = chars[i + 0];
+                var octaveChar = chars[i + 1];
+                var durationChar = chars[i + 2];
+                Console.Write($"{noteChar}{octaveChar}{durationChar} ");
+                buzzer.PlayNote(noteChar, octaveChar, durationChar);
+            }
 
-        buzzer.PlayNote("E4", 250);
-        buzzer.PlayNote("C5", 250);
-        buzzer.PlayNote("B4", 250);
-        buzzer.PlayNote("A4", 500);
-
-        buzzer.PlayNote("E4", 250);
-        buzzer.PlayNote("E5", 250);
-        buzzer.PlayNote("d5", 250);
-        buzzer.PlayNote("E5", 250);
-        buzzer.PlayNote("d5", 250);
-        buzzer.PlayNote("E5", 250);
-        buzzer.PlayNote("B4", 250);
-        buzzer.PlayNote("D5", 250);
-        buzzer.PlayNote("C5", 250);
-        buzzer.PlayNote("A4", 500);
-
-        buzzer.PlayNote("C4", 250);
-        buzzer.PlayNote("E4", 250);
-        buzzer.PlayNote("A4", 250);
-        buzzer.PlayNote("B4", 500);
-
-        buzzer.PlayNote("E4", 250);
-        buzzer.PlayNote("C5", 250);
-        buzzer.PlayNote("B4", 250);
-        buzzer.PlayNote("A4", 500);
+            Thread.Sleep(1000);
+        }
     }
 
 }
