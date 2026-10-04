@@ -24,6 +24,6 @@ into deep sleep until the next button press.
 Long press while LED is off, will be ignored.
 
 
-## Sensors
+## Components
 
 Each notification sound is exposed as a button.
