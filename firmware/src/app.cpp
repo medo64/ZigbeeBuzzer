@@ -74,7 +74,7 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         if (PlayBufferStart != PlayBufferEnd) {  // next note
             uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
             uint16_t duration = PlayBufferDuration[PlayBufferStart];
-            Debug("Play setup for index %d at %d Hz for %d ms", PlayBufferStart, frequency, duration);
+            Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
             if (PlayActive) { ledcDetach(PWM_1_PIN); }
             PlayMs = duration;
             ledcAttachChannel(PWM_1_PIN, frequency, PWM_RESOLUTION, PWM_CHANNEL);
@@ -84,7 +84,7 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         } else if (PlayActive) {  // done with playing
             ledcDetach(PWM_1_PIN);
             PlayActive = false;
-            Debug("Play done");
+            Debug("Play done (%d:%d)", PlayBufferStart, PlayBufferEnd);
         }
     } else {  // note not done yet
         PlayMs--;
