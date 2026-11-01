@@ -113,13 +113,29 @@ void setup() {
 
     Debug("Starting Zigbee");
     if (!Zigbee.begin()) {
-        Debug("Failed to start; rebooting");
+        Debug("Failed to start; restarting");
         ESP.restart();
     }
     Debug("Started Zigbee");
 
     Debug("Connecting to network");
-    while (!Zigbee.connected()) { delay(100); }
+    int64_t connectMillis = millis();
+    uint64_t connectDuration = 0;
+    while (!Zigbee.connected()) {
+        delay(50);
+        connectDuration = millis() - connectMillis;
+        setUserLed((connectDuration / 500) % 2 == 0);
+    }
+    if (connectDuration > 200) {  // assume the first connection
+        addTone(440, 125);
+        addTone(493, 125);
+        addTone(554, 125);
+        addTone(587, 125);
+        addTone(659, 125);
+        addTone(740, 125);
+        addTone(830, 125);
+        addTone(880, 125);
+    }
     Debug("Connected to network");
 
     PlayTimer = timerBegin(1000);
@@ -129,27 +145,38 @@ void setup() {
     setUserLed(false);
 }
 
+int64_t ButtonMillis = 0;
+
 void loop() {
-    if (digitalRead(BTN_USER) == LOW) {
-        Debug("Button clicked");
-        delay(100); // debounce
+    bool buttonPressed = digitalRead(BTN_USER) == LOW;
+    if (buttonPressed && (ButtonMillis == 0)) {  // button pressed
         setUserLed(true);
-
-        int startTime = millis();
-        while (digitalRead(BTN_USER) == LOW) {
-            delay(50);
-            if ((millis() - startTime) > 3000) {
-                Debug("Resetting Zigbee to factory defaults; rebooting");
-                delay(1000);
-                Zigbee.factoryReset();
-            }
-        }
-
+        ButtonMillis = millis();
+    } else if (!buttonPressed && (ButtonMillis != 0)) {  // button released
         setUserLed(false);
+        uint64_t buttonDuration = millis() - ButtonMillis;
+        ButtonMillis = 0;
+        if ((buttonDuration >= 5000) && (buttonDuration <= 10000)) {
+            Debug("Resetting Zigbee to factory defaults; restarting");
+            delay(10);
+            Zigbee.factoryReset();
+        } else if (Serial && (buttonDuration > 10000)) {  // if debugging, just restart device
+            Debug("Restarting");
+            delay(10);
+            ESP.restart();
+        } else if (buttonDuration >= 50) {  // if nothing was done (delay for debounce)
+            Debug("No button action");
+        }
+    } else if (buttonPressed) {  // button held
+        uint64_t buttonDuration = millis() - ButtonMillis;
+        if ((buttonDuration >= 5000) && (buttonDuration <= 10000)) {  // if held for 5-10, blink
+            setUserLed((buttonDuration / 200) % 2 == 0);
+        } else if (buttonDuration > 10000) {  // give up on waiting
+            setUserLed(true);
+        }
     }
-
-    delay(50);
 
     if (ZBSwitch1.getPowerOutletState()) { ZBSwitch1.setState(false); }
     if (ZBSwitch2.getPowerOutletState()) { ZBSwitch2.setState(false); }
+    delay(50);
 }
