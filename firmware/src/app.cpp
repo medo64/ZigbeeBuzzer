@@ -41,7 +41,7 @@ uint32_t PlayBufferFrequency[256];
 uint16_t PlayBufferDuration[256];
 uint8_t PlayBufferStart = 0;
 uint8_t PlayBufferEnd = 0;
-uint16_t PlayMs = 0;
+uint16_t PlayCounter = 0;
 
 
 ZigbeePowerOutlet ZBSwitch1(ZIGBEE_SWITCH_ENDPOINT_1);
@@ -77,21 +77,23 @@ void queueTone(char noteChar, char octaveChar, char durationChar) {
         default: Debug("Unrecognized note char '%c'", noteChar); return;
     }
 
-    uint8_t hundreds;
+    uint16_t duration;
     switch (durationChar) {
-        case '0' : hundreds = 100; break;
-        case '1' : hundreds =  50; break;
-        case '2' : hundreds =  25; break;
-        case '3' : hundreds =  12; break;
-        case '4' : hundreds =   6; break;
-        case '5' : hundreds =   3; break;
-        case '6' : hundreds =   2; break;
-        case '7' : hundreds =   1; break;
+        case '0' : duration = 1000; break;
+        case '1' : duration =  500; break;
+        case '2' : duration =  250; break;
+        case '3' : duration =  125; break;
+        case '4' : duration =   62; break;
+        case '5' : duration =   31; break;
+        case '6' : duration =   16; break;
+        case '7' : duration =   8; break;
+        case '8' : duration =   4; break;
+        case '9' : duration =   2; break;
         default:
             if ((durationChar >= 'A') && (durationChar <= 'Z')) {
-                hundreds = durationChar - 'A' + 1;
+                duration = (durationChar - 'A' + 1) * 10;
             } else if ((durationChar >= 'a') && (durationChar <= 'z')) {
-                hundreds = durationChar - 'a' + 27;
+                duration = (durationChar - 'a' + 27) * 10;
             } else {
                 Debug("Unrecognized duration char '%c'", durationChar);
                 return;
@@ -100,7 +102,7 @@ void queueTone(char noteChar, char octaveChar, char durationChar) {
     }
 
     PlayBufferFrequency[PlayBufferEnd] = frequency;
-    PlayBufferDuration[PlayBufferEnd] = hundreds * 10;
+    PlayBufferDuration[PlayBufferEnd] = duration;
     PlayBufferEnd = newPlayBufferEnd;
 }
 
@@ -147,18 +149,22 @@ void setState2(bool value) {
     }
 }
 
+void setVolume(float value) {
+    Debug("Volume set to %f", value);
+}
+
 void setUserLed(bool value) {
     digitalWrite(LED_USER, value ? LOW : HIGH);
 }
 
 void ARDUINO_ISR_ATTR onPlayTimer() {
-    if (PlayMs == 0) {
+    if (PlayCounter == 0) {
         if (PlayBufferStart != PlayBufferEnd) {  // next note
             uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
             uint16_t duration = PlayBufferDuration[PlayBufferStart];
             Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
             if (PlayActive) { ledcDetach(PWM_1_PIN); }
-            PlayMs = duration;
+            PlayCounter = duration;
             ledcAttachChannel(PWM_1_PIN, frequency, PWM_RESOLUTION, PWM_CHANNEL);
             ledcWriteChannel(PWM_CHANNEL, 50);
             PlayActive = true;
@@ -169,7 +175,7 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
             Debug("Play done (%d:%d)", PlayBufferStart, PlayBufferEnd);
         }
     } else {  // note not done yet
-        PlayMs--;
+        PlayCounter--;
     }
 }
 
