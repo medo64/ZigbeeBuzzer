@@ -4,6 +4,8 @@
 
 #include "Zigbee.h"
 
+#define Debug(...) if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
+
 
 #define ZIGBEE_SWITCH_ENDPOINT_1 1
 #define ZIGBEE_SWITCH_ENDPOINT_2 2
@@ -43,23 +45,23 @@ void addTone(uint32_t frequency, uint16_t duration) {
 
 void setState1(bool value) {
     if (value) {
-        if (Serial) { Serial.println("Switch 1 on"); }
+        Debug("Switch 1 on");
         addTone(440, 250);
         addTone(415, 250);
         addTone(440, 250);
     } else {
-        if (Serial) { Serial.println("Switch 1 off"); }
+        Debug("Switch 1 off");
     }
 }
 
 void setState2(bool value) {
     if (value) {
-        if (Serial) { Serial.println("Switch 2 on"); }
+        Debug("Switch 2 on");
         addTone(329, 250);
         addTone(369, 250);
         addTone(329, 250);
     } else {
-        if (Serial) { Serial.println("Switch 2 off"); }
+        Debug("Switch 2 off");
     }
 }
 
@@ -72,15 +74,7 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         if (PlayBufferStart != PlayBufferEnd) {  // next note
             uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
             uint16_t duration = PlayBufferDuration[PlayBufferStart];
-            if (Serial) {
-                Serial.print("Play setup for index ");
-                Serial.print(PlayBufferStart, DEC);
-                Serial.print(" at ");
-                Serial.print(frequency, DEC);
-                Serial.print(" Hz for ");
-                Serial.print(duration, DEC);
-                Serial.println("ms");
-            }
+            Debug("Play setup for index %d at %d Hz for %d ms", PlayBufferStart, frequency, duration);
             if (PlayActive) { ledcDetach(PWM_1_PIN); }
             PlayMs = duration;
             ledcAttachChannel(PWM_1_PIN, frequency, PWM_RESOLUTION, PWM_CHANNEL);
@@ -90,7 +84,7 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         } else if (PlayActive) {  // done with playing
             ledcDetach(PWM_1_PIN);
             PlayActive = false;
-            if (Serial) { Serial.println("Play done"); }
+            Debug("Play done");
         }
     } else {  // note not done yet
         PlayMs--;
@@ -105,7 +99,7 @@ void setup() {
     pinMode(LED_USER, OUTPUT);
     pinMode(BTN_USER, INPUT_PULLUP);
 
-    if (Serial) { Serial.println("Adding endpoints"); }
+    Debug("Adding endpoints");
 
     ZBSwitch1.setManufacturerAndModel("Medo64", "Switch 1");
     ZBSwitch1.onPowerOutletChange(setState1);
@@ -115,24 +109,18 @@ void setup() {
     ZBSwitch2.onPowerOutletChange(setState2);
     Zigbee.addEndpoint(&ZBSwitch2);
 
-    if (Serial) { Serial.println("Added endpoints"); }
+    Debug("Added endpoints");
 
-    if (Serial) { Serial.println("Starting Zigbee"); }
+    Debug("Starting Zigbee");
     if (!Zigbee.begin()) {
-        if (Serial) { Serial.println("Failed to start; rebooting"); }
+        Debug("Failed to start; rebooting");
         ESP.restart();
     }
-    if (Serial) { Serial.println("Started Zigbee"); }
+    Debug("Started Zigbee");
 
-    if (Serial) { Serial.print("Connecting to network"); }
-    while (!Zigbee.connected()) {
-        if (Serial) { Serial.print("."); }
-        delay(100);
-    }
-    if (Serial) {
-        Serial.println();
-        Serial.println("Connected to network");
-    }
+    Debug("Connecting to network");
+    while (!Zigbee.connected()) { delay(100); }
+    Debug("Connected to network");
 
     PlayTimer = timerBegin(1000);
     timerAttachInterrupt(PlayTimer, &onPlayTimer);
@@ -143,14 +131,15 @@ void setup() {
 
 void loop() {
     if (digitalRead(BTN_USER) == LOW) {
-        delay(100);  // debounce
+        Debug("Button clicked");
+        delay(100); // debounce
         setUserLed(true);
 
         int startTime = millis();
         while (digitalRead(BTN_USER) == LOW) {
             delay(50);
             if ((millis() - startTime) > 3000) {
-                if (Serial) { Serial.println("Resetting Zigbee to factory defaults; rebooting"); }
+                Debug("Resetting Zigbee to factory defaults; rebooting");
                 delay(1000);
                 Zigbee.factoryReset();
             }
