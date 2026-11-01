@@ -43,23 +43,23 @@ void addTone(uint32_t frequency, uint16_t duration) {
 
 void setState1(bool value) {
     if (value) {
-        Serial.println("Switch 1 on");
+        if (Serial) { Serial.println("Switch 1 on"); }
         addTone(440, 250);
         addTone(415, 250);
         addTone(440, 250);
     } else {
-        Serial.println("Switch 1 off");
+        if (Serial) { Serial.println("Switch 1 off"); }
     }
 }
 
 void setState2(bool value) {
     if (value) {
-        Serial.println("Switch 2 on");
+        if (Serial) { Serial.println("Switch 2 on"); }
         addTone(329, 250);
         addTone(369, 250);
         addTone(329, 250);
     } else {
-        Serial.println("Switch 2 off");
+        if (Serial) { Serial.println("Switch 2 off"); }
     }
 }
 
@@ -72,13 +72,15 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         if (PlayBufferStart != PlayBufferEnd) {  // next note
             uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
             uint16_t duration = PlayBufferDuration[PlayBufferStart];
-            Serial.print("Play setup for index ");
-            Serial.print(PlayBufferStart, DEC);
-            Serial.print(" at ");
-            Serial.print(frequency, DEC);
-            Serial.print(" Hz for ");
-            Serial.print(duration, DEC);
-            Serial.println("ms");
+            if (Serial) {
+                Serial.print("Play setup for index ");
+                Serial.print(PlayBufferStart, DEC);
+                Serial.print(" at ");
+                Serial.print(frequency, DEC);
+                Serial.print(" Hz for ");
+                Serial.print(duration, DEC);
+                Serial.println("ms");
+            }
             if (PlayActive) { ledcDetach(PWM_1_PIN); }
             PlayMs = duration;
             ledcAttachChannel(PWM_1_PIN, frequency, PWM_RESOLUTION, PWM_CHANNEL);
@@ -88,7 +90,7 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         } else if (PlayActive) {  // done with playing
             ledcDetach(PWM_1_PIN);
             PlayActive = false;
-            Serial.println("Play done");
+            if (Serial) { Serial.println("Play done"); }
         }
     } else {  // note not done yet
         PlayMs--;
@@ -103,7 +105,7 @@ void setup() {
     pinMode(LED_USER, OUTPUT);
     pinMode(BTN_USER, INPUT_PULLUP);
 
-    Serial.println("Adding endpoints");
+    if (Serial) { Serial.println("Adding endpoints"); }
 
     ZBSwitch1.setManufacturerAndModel("Medo64", "Switch 1");
     ZBSwitch1.onPowerOutletChange(setState1);
@@ -113,22 +115,24 @@ void setup() {
     ZBSwitch2.onPowerOutletChange(setState2);
     Zigbee.addEndpoint(&ZBSwitch2);
 
-    Serial.println("Added endpoints");
+    if (Serial) { Serial.println("Added endpoints"); }
 
-    Serial.println("Starting Zigbee");
+    if (Serial) { Serial.println("Starting Zigbee"); }
     if (!Zigbee.begin()) {
-        Serial.println("Failed to start; rebooting");
+        if (Serial) { Serial.println("Failed to start; rebooting"); }
         ESP.restart();
     }
-    Serial.println("Started Zigbee");
+    if (Serial) { Serial.println("Started Zigbee"); }
 
-    Serial.print("Connecting to network");
+    if (Serial) { Serial.print("Connecting to network"); }
     while (!Zigbee.connected()) {
-        Serial.print(".");
+        if (Serial) { Serial.print("."); }
         delay(100);
     }
-    Serial.println();
-    Serial.println("Connected to network");
+    if (Serial) {
+        Serial.println();
+        Serial.println("Connected to network");
+    }
 
     PlayTimer = timerBegin(1000);
     timerAttachInterrupt(PlayTimer, &onPlayTimer);
@@ -146,7 +150,7 @@ void loop() {
         while (digitalRead(BTN_USER) == LOW) {
             delay(50);
             if ((millis() - startTime) > 3000) {
-                Serial.println("Resetting Zigbee to factory defaults; rebooting");
+                if (Serial) { Serial.println("Resetting Zigbee to factory defaults; rebooting"); }
                 delay(1000);
                 Zigbee.factoryReset();
             }
