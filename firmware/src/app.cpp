@@ -9,12 +9,12 @@
 
 #define ZIGBEE_SWITCH_ENDPOINT_1 1
 #define ZIGBEE_SWITCH_ENDPOINT_2 2
+#define ZIGBEE_ANALOG_ENDPOINT 101
 
 #define BTN_BOOT BOOT_PIN
 #define BTN_USER 20
 #define LED_USER 15
 
-#define PWM_CHANNEL 0
 #define PWM_RESOLUTION 8
 
 #define PWM_1_PIN  2
@@ -36,16 +36,18 @@ static constexpr uint16_t Frequencies[] = {  //    C     C#    D     D#     E   
 
 
 hw_timer_t* PlayTimer;
-bool PlayActive = false;
-uint32_t PlayBufferFrequency[256];
-uint16_t PlayBufferDuration[256];
-uint8_t PlayBufferStart = 0;
-uint8_t PlayBufferEnd = 0;
+uint8_t PlayVolume = 0;
+volatile uint8_t PlayVolumeSet = 1;
+volatile uint32_t PlayBufferFrequency[256];
+volatile uint16_t PlayBufferDuration[256];
+volatile uint8_t PlayBufferStart = 0;
+volatile uint8_t PlayBufferEnd = 0;
 uint16_t PlayCounter = 0;
 
 
 ZigbeePowerOutlet ZBSwitch1(ZIGBEE_SWITCH_ENDPOINT_1);
 ZigbeePowerOutlet  ZBSwitch2(ZIGBEE_SWITCH_ENDPOINT_2);
+ZigbeeAnalog ZBVolume(ZIGBEE_ANALOG_ENDPOINT);
 
 void queueTone(char noteChar, char octaveChar, char durationChar) {
     uint8_t newPlayBufferEnd = PlayBufferEnd + 1;
@@ -150,7 +152,9 @@ void setState2(bool value) {
 }
 
 void setVolume(float value) {
-    Debug("Volume set to %f", value);
+    uint8_t newValue = (uint8_t)value;
+    PlayVolumeSet = newValue;
+    Debug("Volume set to %d", newValue);
 }
 
 void setUserLed(bool value) {
@@ -162,17 +166,33 @@ void ARDUINO_ISR_ATTR onPlayTimer() {
         if (PlayBufferStart != PlayBufferEnd) {  // next note
             uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
             uint16_t duration = PlayBufferDuration[PlayBufferStart];
-            Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
-            if (PlayActive) { ledcDetach(PWM_1_PIN); }
+            //Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
+            if (PlayVolume > 0) {
+                //Debug("Detaching PWM %d", PlayVolume);
+                switch (PlayVolume) {
+                    case 1: ledcDetach(PWM_1_PIN); break;
+                    case 2: ledcDetach(PWM_2_PIN); break;
+                    case 3: ledcDetach(PWM_3_PIN); break;
+                }
+            }
             PlayCounter = duration;
-            ledcAttachChannel(PWM_1_PIN, frequency, PWM_RESOLUTION, PWM_CHANNEL);
-            ledcWriteChannel(PWM_CHANNEL, 50);
-            PlayActive = true;
+            PlayVolume = PlayVolumeSet;
+            //Debug("Attaching PWM %d", PlayVolume);
+            switch (PlayVolume) {
+                case 1: ledcAttach(PWM_1_PIN, frequency, PWM_RESOLUTION); ledcWrite(PWM_1_PIN, 50); break;
+                case 2: ledcAttach(PWM_2_PIN, frequency, PWM_RESOLUTION); ledcWrite(PWM_2_PIN, 50); break;
+                case 3: ledcAttach(PWM_3_PIN, frequency, PWM_RESOLUTION); ledcWrite(PWM_3_PIN, 50); break;
+            }
             PlayBufferStart += 1;
-        } else if (PlayActive) {  // done with playing
-            ledcDetach(PWM_1_PIN);
-            PlayActive = false;
-            Debug("Play done (%d:%d)", PlayBufferStart, PlayBufferEnd);
+        } else if (PlayVolume > 0) {  // done with playing
+            //Debug("Detaching PWM %d", PlayVolume);
+            switch (PlayVolume) {
+                case 1: ledcDetach(PWM_1_PIN); break;
+                case 2: ledcDetach(PWM_2_PIN); break;
+                case 3: ledcDetach(PWM_3_PIN); break;
+            }
+            PlayVolume = 0;
+            //Debug("Play done (%d:%d)", PlayBufferStart, PlayBufferEnd);
         }
     } else {  // note not done yet
         PlayCounter--;
@@ -184,18 +204,35 @@ void setup() {
     Serial.begin(115200);
     delay(500);
 
+    Debug("Setup preferences");
+    PlayVolumeSet = 1;
+
+    Debug("Setup pins");
     pinMode(LED_USER, OUTPUT);
     pinMode(BTN_USER, INPUT_PULLUP);
 
+    Debug("Setup timers");
+    PlayTimer = timerBegin(1000);
+    timerAttachInterrupt(PlayTimer, &onPlayTimer);
+    timerAlarm(PlayTimer, 1, true, 0);
+
     Debug("Adding endpoints");
 
-    ZBSwitch1.setManufacturerAndModel("Medo64", "Switch 1");
+    ZBSwitch1.setManufacturerAndModel("Medo64", "Buzzer Switch 1");
     ZBSwitch1.onPowerOutletChange(setState1);
     Zigbee.addEndpoint(&ZBSwitch1);
 
-    ZBSwitch2.setManufacturerAndModel("Medo64", "Switch 2");
+    ZBSwitch2.setManufacturerAndModel("Medo64", "Buzzer Switch 2");
     ZBSwitch2.onPowerOutletChange(setState2);
     Zigbee.addEndpoint(&ZBSwitch2);
+
+    ZBVolume.setManufacturerAndModel("Medo64", "Buzzer Volume");
+    ZBVolume.addAnalogOutput();
+    ZBVolume.setAnalogOutputDescription("Volume");
+    ZBVolume.setAnalogOutputMinMax(1, 3);
+    ZBVolume.setAnalogOutputResolution(1);
+    ZBVolume.onAnalogOutputChange(setVolume);
+    Zigbee.addEndpoint(&ZBVolume);
 
     Debug("Added endpoints");
 
@@ -219,9 +256,7 @@ void setup() {
     }
     Debug("Connected to network");
 
-    PlayTimer = timerBegin(1000);
-    timerAttachInterrupt(PlayTimer, &onPlayTimer);
-    timerAlarm(PlayTimer, 1, true, 0);
+    ZBVolume.setAnalogOutput((float)PlayVolumeSet);
 
     setUserLed(false);
 }
