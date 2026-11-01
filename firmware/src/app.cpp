@@ -47,7 +47,6 @@ void setState1(bool value) {
         addTone(440, 250);
         addTone(415, 250);
         addTone(440, 250);
-        ZBSwitch1.setState(false);
     } else {
         Serial.println("Switch 1 off");
     }
@@ -59,7 +58,6 @@ void setState2(bool value) {
         addTone(329, 250);
         addTone(369, 250);
         addTone(329, 250);
-        ZBSwitch2.setState(false);
     } else {
         Serial.println("Switch 2 off");
     }
@@ -154,10 +152,11 @@ void loop() {
             }
         }
 
-        Serial.println("Manual toggle");
-        ZBSwitch1.setState(!ZBSwitch1.getPowerOutletState());
+        setUserLed(false);
     }
 
-    setUserLed(PlayActive);
     delay(50);
+
+    if (ZBSwitch1.getPowerOutletState()) { ZBSwitch1.setState(false); }
+    if (ZBSwitch2.getPowerOutletState()) { ZBSwitch2.setState(false); }
 }
