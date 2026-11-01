@@ -94,18 +94,15 @@ internal class App {
             var duration = 1000 / int.Parse(durations[i]);
             var duration100 = duration / 10;
             while (duration100 > 0) {
-                if (duration100 < 10) {
-                    chars.Add((char)('0' + duration100));
+                if (duration100 <= 25) {
+                    chars.Add((char)('A' - 1 + duration100));
                     duration100 = 0;
-                } else if (duration100 < 36) {
-                    chars.Add((char)('A' + duration100 - 10));
-                    duration100 = 0;
-                } else if (duration100 < 62) {
-                    chars.Add((char)('a' + duration100 - 10 - 26));
+                } else if (duration100 <= 50) {
+                    chars.Add((char)('a' - 26 + duration100));
                     duration100 = 0;
                 } else {
-                    chars.Add('z');
-                    duration100 -= 62;
+                    chars.Add('y');
+                    duration100 -= 50;
                     chars.AddRange([.. note]);
                 }
             }
@@ -114,18 +111,16 @@ internal class App {
             var durationSilent = (int)(duration * 0.30);
             var durationSilent100 = durationSilent / 10;
             if (durationSilent100 == 0) { durationSilent100 = 1; }
-                if (durationSilent100 < 10) {
-                    chars.Add((char)('0' + durationSilent100));
-                } else if (durationSilent100 < 36) {
-                    chars.Add((char)('A' + durationSilent100 - 10));
-                } else if (durationSilent100 < 62) {
-                    chars.Add((char)('a' + durationSilent100 - 10 - 26));
+                if (durationSilent100 <= 25) {
+                    chars.Add((char)('A' - 1 + durationSilent100));
+                } else if (durationSilent100 < 50) {
+                    chars.Add((char)('a' - 26 + durationSilent100));
                 } else {
                     throw new InvalidDataException($"Too much delay ({durationSilent100} for {duration} ms duration)");
                 }
         }
 
         if (chars.Count % 3 != 0) { throw new InvalidDataException("Invalid tone count"); }
-        return chars.ToArray();
+        return [.. chars];
     }
 }

@@ -82,10 +82,26 @@ internal class Buzzer : IDisposable {
     }
 
     public void PlayNote(char noteChar, char octaveChar, char durationChar) {
-        var hundreds = (durationChar is >= '1' and <= '9') ? (durationChar - '0')
-                     : (durationChar is >= 'A' and <= 'Z') ? (durationChar - 'A' + 10)
-                     : (durationChar is >= 'a' and <= 'z') ? (durationChar - 'a' + 36)
-                     : throw new InvalidOperationException($"Unknown duration ({durationChar}).");
+        int hundreds;
+        switch (durationChar) { 
+            case '0': hundreds = 100; break;
+            case '1': hundreds =  50; break;
+            case '2': hundreds =  25; break;
+            case '3': hundreds =  12; break;
+            case '4': hundreds =   6; break;
+            case '5': hundreds =   3; break;
+            case '6': hundreds =   2; break;
+            case '7': hundreds =   1; break;
+            default:
+                if (durationChar is >= 'A' and <= 'Z') {
+                    hundreds = durationChar - 'A' + 1;
+                } else if (durationChar is >= 'a' and <= 'z') {
+                    hundreds = durationChar - 'a' + 27;
+                } else {
+                    throw new InvalidOperationException($"Unknown duration ({durationChar}).");
+                }
+                break;
+        }
         PlayNote(noteChar, octaveChar, hundreds * 10);
     }
 
