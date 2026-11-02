@@ -276,9 +276,9 @@ void loop() {
                 if (PlayVolume > 0) {  // volume already exists
                     Debug("Play detaching PWM %d", PlayVolume);
                     switch (PlayVolume) {
-                        case 1: ledcDetach(PWM_1_PIN); break;
-                        case 2: ledcDetach(PWM_2_PIN); break;
-                        case 3: ledcDetach(PWM_3_PIN); break;
+                        case 1: ledcDetach(PWM_1_PIN); pinMode(PWM_1_PIN, INPUT); break;
+                        case 2: ledcDetach(PWM_2_PIN); pinMode(PWM_2_PIN, INPUT); break;
+                        case 3: ledcDetach(PWM_3_PIN); pinMode(PWM_3_PIN, INPUT); break;
                     }
                 }
                 PlayVolume = PlayVolumeNext;
