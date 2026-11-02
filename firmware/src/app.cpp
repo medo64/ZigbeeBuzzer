@@ -41,10 +41,10 @@ bool PlayActive = false;  // if currently playing
 uint8_t PlayVolume = 0;  // PWMs that were configured
 volatile uint8_t PlayVolumeNext = 0;  // next PWM setup
 uint32_t PlayBufferFrequency[256];
-uint16_t PlayBufferDuration[256];
+uint8_t PlayBufferCounter[256];
 uint8_t PlayBufferStart = 0;
 uint8_t PlayBufferEnd = 0;
-uint16_t PlayCounter = 0;
+uint8_t PlayCounter = 0;
 
 
 ZigbeePowerOutlet ZBSwitch1(ZIGBEE_SWITCH_ENDPOINT_1);
@@ -81,23 +81,21 @@ void queueTone(char noteChar, char octaveChar, char durationChar) {
         default: Debug("Unrecognized note char '%c'", noteChar); return;
     }
 
-    uint16_t duration;
+    uint8_t hundredths;
     switch (durationChar) {
-        case '0' : duration = 1000; break;
-        case '1' : duration =  500; break;
-        case '2' : duration =  250; break;
-        case '3' : duration =  125; break;
-        case '4' : duration =   62; break;
-        case '5' : duration =   31; break;
-        case '6' : duration =   16; break;
-        case '7' : duration =   8; break;
-        case '8' : duration =   4; break;
-        case '9' : duration =   2; break;
+        case '0' : hundredths = 100; break;
+        case '1' : hundredths =  50; break;
+        case '2' : hundredths =  25; break;
+        case '3' : hundredths =  12; break;
+        case '4' : hundredths =   6; break;
+        case '5' : hundredths =   3; break;
+        case '6' : hundredths =   2; break;
+        case '7' : hundredths =   1; break;
         default:
             if ((durationChar >= 'A') && (durationChar <= 'Z')) {
-                duration = (durationChar - 'A' + 1) * 10;
+                hundredths = durationChar - 'A' + 1;
             } else if ((durationChar >= 'a') && (durationChar <= 'z')) {
-                duration = (durationChar - 'a' + 27) * 10;
+                hundredths = durationChar - 'a' + 27;
             } else {
                 Debug("Unrecognized duration char '%c'", durationChar);
                 return;
@@ -106,7 +104,7 @@ void queueTone(char noteChar, char octaveChar, char durationChar) {
     }
 
     PlayBufferFrequency[PlayBufferEnd] = frequency;
-    PlayBufferDuration[PlayBufferEnd] = duration;
+    PlayBufferCounter[PlayBufferEnd] = hundredths;
     PlayBufferEnd = newPlayBufferEnd;
 }
 
@@ -257,9 +255,9 @@ void loop() {
         if (PlayBufferStart != PlayBufferEnd) {  // next note exists
             std::lock_guard<std::mutex> guard(PlayMutex);
             uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
-            uint16_t duration = PlayBufferDuration[PlayBufferStart];
-            Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
-            PlayCounter = duration;
+            uint8_t hundredths = PlayBufferCounter[PlayBufferStart];
+            Debug("Play %d Hz for %d0 ms (%d:%d)", frequency, hundredths, PlayBufferStart, PlayBufferEnd);
+            PlayCounter = hundredths;
 
             if (PlayVolume == PlayVolumeNext) {  // use  the same PWM
                 Debug("Play changing frequency for PWM %d", PlayVolume);
@@ -315,7 +313,7 @@ void loop() {
 
     } else {  // note currently in progress
         PlayCounter--;
-        delay(1);
+        delay(10);
     }
 
     if (ZBSwitch1.getPowerOutletState()) { Debug("Switch 1 to off"); ZBSwitch1.setState(false); }
