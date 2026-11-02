@@ -3,6 +3,7 @@
 #endif
 
 #include "Zigbee.h"
+#include <mutex>
 
 #define Debug(...) if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
 
@@ -35,13 +36,14 @@ static constexpr uint16_t Frequencies[] = {  //    C     C#    D     D#     E   
                                             };
 
 
-hw_timer_t* PlayTimer;
-uint8_t PlayVolume = 0;
-volatile uint8_t PlayVolumeSet = 1;
-volatile uint32_t PlayBufferFrequency[256];
-volatile uint16_t PlayBufferDuration[256];
-volatile uint8_t PlayBufferStart = 0;
-volatile uint8_t PlayBufferEnd = 0;
+std::mutex PlayMutex;
+bool PlayActive = false;  // if currently playing
+uint8_t PlayVolume = 0;  // PWMs that were configured
+volatile uint8_t PlayVolumeNext = 0;  // next PWM setup
+uint32_t PlayBufferFrequency[256];
+uint16_t PlayBufferDuration[256];
+uint8_t PlayBufferStart = 0;
+uint8_t PlayBufferEnd = 0;
 uint16_t PlayCounter = 0;
 
 
@@ -108,7 +110,8 @@ void queueTone(char noteChar, char octaveChar, char durationChar) {
     PlayBufferEnd = newPlayBufferEnd;
 }
 
-void queueTone(char* chars) {
+void queueTones(char* chars) {
+    std::lock_guard<std::mutex> guard(PlayMutex);
     while(true) {
         if (*chars == '\0') { break; }
 
@@ -136,7 +139,7 @@ void queueTone(char* chars) {
 void setState1(bool value) {
     if (value) {
         Debug("Switch 1 on");
-        queueTone("A42 g42 A42");
+        queueTones("A42 g42 A42");
     } else {
         Debug("Switch 1 off");
     }
@@ -145,7 +148,7 @@ void setState1(bool value) {
 void setState2(bool value) {
     if (value) {
         Debug("Switch 2 on");
-        queueTone("E42 f42 E42");
+        queueTones("E42 f42 E42");
     } else {
         Debug("Switch 2 off");
     }
@@ -153,50 +156,12 @@ void setState2(bool value) {
 
 void setVolume(float value) {
     uint8_t newValue = (uint8_t)value;
-    PlayVolumeSet = newValue;
+    PlayVolumeNext = newValue;
     Debug("Volume set to %d", newValue);
 }
 
 void setUserLed(bool value) {
     digitalWrite(LED_USER, value ? LOW : HIGH);
-}
-
-void ARDUINO_ISR_ATTR onPlayTimer() {
-    if (PlayCounter == 0) {
-        if (PlayBufferStart != PlayBufferEnd) {  // next note
-            uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
-            uint16_t duration = PlayBufferDuration[PlayBufferStart];
-            //Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
-            if (PlayVolume > 0) {
-                //Debug("Detaching PWM %d", PlayVolume);
-                switch (PlayVolume) {
-                    case 1: ledcDetach(PWM_1_PIN); break;
-                    case 2: ledcDetach(PWM_2_PIN); break;
-                    case 3: ledcDetach(PWM_3_PIN); break;
-                }
-            }
-            PlayCounter = duration;
-            PlayVolume = PlayVolumeSet;
-            //Debug("Attaching PWM %d", PlayVolume);
-            switch (PlayVolume) {
-                case 1: ledcAttach(PWM_1_PIN, frequency, PWM_RESOLUTION); ledcWrite(PWM_1_PIN, 50); break;
-                case 2: ledcAttach(PWM_2_PIN, frequency, PWM_RESOLUTION); ledcWrite(PWM_2_PIN, 50); break;
-                case 3: ledcAttach(PWM_3_PIN, frequency, PWM_RESOLUTION); ledcWrite(PWM_3_PIN, 50); break;
-            }
-            PlayBufferStart += 1;
-        } else if (PlayVolume > 0) {  // done with playing
-            //Debug("Detaching PWM %d", PlayVolume);
-            switch (PlayVolume) {
-                case 1: ledcDetach(PWM_1_PIN); break;
-                case 2: ledcDetach(PWM_2_PIN); break;
-                case 3: ledcDetach(PWM_3_PIN); break;
-            }
-            PlayVolume = 0;
-            //Debug("Play done (%d:%d)", PlayBufferStart, PlayBufferEnd);
-        }
-    } else {  // note not done yet
-        PlayCounter--;
-    }
 }
 
 
@@ -205,16 +170,11 @@ void setup() {
     delay(500);
 
     Debug("Setup preferences");
-    PlayVolumeSet = 1;
+    PlayVolumeNext = 1;
 
     Debug("Setup pins");
     pinMode(LED_USER, OUTPUT);
     pinMode(BTN_USER, INPUT_PULLUP);
-
-    Debug("Setup timers");
-    PlayTimer = timerBegin(1000);
-    timerAttachInterrupt(PlayTimer, &onPlayTimer);
-    timerAlarm(PlayTimer, 1, true, 0);
 
     Debug("Adding endpoints");
 
@@ -252,11 +212,11 @@ void setup() {
         setUserLed((connectDuration / 500) % 2 == 0);
     }
     if (connectDuration > 200) {  // assume the first connection
-        queueTone("A43 B43 c53 D53 E53 f53 g53 A53");
+        queueTones("A43 B43 c53 D53 E53 f53 g53 A53");
     }
     Debug("Connected to network");
 
-    ZBVolume.setAnalogOutput((float)PlayVolumeSet);
+    ZBVolume.setAnalogOutput((float)PlayVolumeNext);
 
     setUserLed(false);
 }
@@ -292,7 +252,72 @@ void loop() {
         }
     }
 
+    if (PlayCounter == 0) {  // nothing playing or playing tone just finished
+
+        if (PlayBufferStart != PlayBufferEnd) {  // next note exists
+            std::lock_guard<std::mutex> guard(PlayMutex);
+            uint32_t frequency = PlayBufferFrequency[PlayBufferStart];
+            uint16_t duration = PlayBufferDuration[PlayBufferStart];
+            Debug("Play %d Hz for %d ms (%d:%d)", frequency, duration, PlayBufferStart, PlayBufferEnd);
+            PlayCounter = duration;
+
+            if (PlayVolume == PlayVolumeNext) {  // use  the same PWM
+                Debug("Play changing frequency for PWM %d", PlayVolume);
+                switch (PlayVolume) {
+                    case 1: ledcChangeFrequency(PWM_1_PIN, frequency, PWM_RESOLUTION); break;
+                    case 2: ledcChangeFrequency(PWM_2_PIN, frequency, PWM_RESOLUTION); break;
+                    case 3: ledcChangeFrequency(PWM_3_PIN, frequency, PWM_RESOLUTION); break;
+                }
+
+            } else {  // there was a change in play volume
+                if (PlayVolume > 0) {  // volume already exists
+                    Debug("Play detaching PWM %d", PlayVolume);
+                    switch (PlayVolume) {
+                        case 1: ledcDetach(PWM_1_PIN); break;
+                        case 2: ledcDetach(PWM_2_PIN); break;
+                        case 3: ledcDetach(PWM_3_PIN); break;
+                    }
+                }
+                PlayVolume = PlayVolumeNext;
+                Debug("Play attaching PWM %d", PlayVolume);
+                switch (PlayVolume) {
+                    case 1: ledcAttach(PWM_1_PIN, frequency, PWM_RESOLUTION); break;
+                    case 2: ledcAttach(PWM_2_PIN, frequency, PWM_RESOLUTION); break;
+                    case 3: ledcAttach(PWM_3_PIN, frequency, PWM_RESOLUTION); break;
+                }
+                PlayActive = false;
+            }
+
+            if (!PlayActive) {
+                Debug("Play setting duty cycle for PWM %d", PlayVolume);
+                switch (PlayVolume) {
+                    case 1: ledcWrite(PWM_1_PIN, 50); break;
+                    case 2: ledcWrite(PWM_2_PIN, 50); break;
+                    case 3: ledcWrite(PWM_3_PIN, 50); break;
+                }
+                PlayActive = true;
+            }
+            PlayBufferStart += 1;
+
+        } else if (PlayActive) {  // done with playing
+            Debug("Play silencing PWM %d", PlayVolume);
+            switch (PlayVolume) {
+                case 1: ledcWrite(PWM_1_PIN, 0); break;
+                case 2: ledcWrite(PWM_2_PIN, 0); break;
+                case 3: ledcWrite(PWM_3_PIN, 0); break;
+            }
+            PlayActive = false;
+            Debug("Play done (%d:%d)", PlayBufferStart, PlayBufferEnd);
+
+        } else {  // nothing to do
+            delay(50);
+        }
+
+    } else {  // note currently in progress
+        PlayCounter--;
+        delay(1);
+    }
+
     if (ZBSwitch1.getPowerOutletState()) { Debug("Switch 1 to off"); ZBSwitch1.setState(false); }
     if (ZBSwitch2.getPowerOutletState()) { Debug("Switch 2 to off"); ZBSwitch2.setState(false); }
-    delay(50);
 }
