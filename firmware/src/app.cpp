@@ -2,8 +2,9 @@
     #error "Zigbee end device mode is not selected"
 #endif
 
-#include "Zigbee.h"
 #include <mutex>
+#include "Preferences.h"
+#include "Zigbee.h"
 
 #define Debug(...) if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
 
@@ -50,6 +51,7 @@ uint8_t PlayCounter = 0;
 ZigbeePowerOutlet ZBSwitch1(ZIGBEE_SWITCH_ENDPOINT_1);
 ZigbeePowerOutlet  ZBSwitch2(ZIGBEE_SWITCH_ENDPOINT_2);
 ZigbeeAnalog ZBVolume(ZIGBEE_ANALOG_ENDPOINT);
+
 
 void queueTone(char noteChar, char octaveChar, char durationChar) {
     uint8_t newPlayBufferEnd = PlayBufferEnd + 1;
@@ -163,12 +165,14 @@ void setUserLed(bool value) {
 }
 
 
+Preferences Preferences;
+
 void setup() {
     Serial.begin(115200);
-    delay(500);
 
     Debug("Setup preferences");
-    PlayVolumeNext = 1;
+    Preferences.begin("Volume", false);
+    PlayVolumeNext = Preferences.getUChar("Volume", 3);;
 
     Debug("Setup pins");
     pinMode(LED_USER, OUTPUT);
@@ -218,6 +222,7 @@ void setup() {
 
     setUserLed(false);
 }
+
 
 int64_t ButtonMillis = 0;
 
@@ -283,6 +288,7 @@ void loop() {
                     case 2: ledcAttach(PWM_2_PIN, frequency, PWM_RESOLUTION); break;
                     case 3: ledcAttach(PWM_3_PIN, frequency, PWM_RESOLUTION); break;
                 }
+                Preferences.putUChar("Volume", PlayVolume);
                 PlayActive = false;
             }
 
