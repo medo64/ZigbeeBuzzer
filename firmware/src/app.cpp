@@ -163,6 +163,8 @@ void setup() {
 
     Debug("Adding endpoints");
 
+    Zigbee.role(ZIGBEE_END_DEVICE);
+
     for (size_t i = 0; i < ZIGBEE_SOUND_COUNT; i++) {
         char description[16];
         snprintf(description, sizeof(description), "Sound %u", static_cast<unsigned>(i + 1));
@@ -312,6 +314,9 @@ void loop() {
     }
 
     for (size_t i = 0; i < ZIGBEE_SOUND_COUNT; i++) {
-        if (ZBSounds[i]->getBinaryOutput()) { ZBSounds[i]->setBinaryOutput(false); }
+        if (ZBSounds[i]->getBinaryOutput()) {
+            ZBSounds[i]->setBinaryOutput(false);
+            ZBSounds[i]->reportBinaryOutput();
+        }
     }
 }
