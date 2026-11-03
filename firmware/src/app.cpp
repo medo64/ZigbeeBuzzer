@@ -6,8 +6,10 @@
 #include "Preferences.h"
 #include "Zigbee.h"
 
-#define Debug(...) if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
-
+#define DebugInit()
+#define Debug(...)
+//#define DebugInit() Serial.begin(115200);
+//#define Debug(...)  if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
 
 #define ZIGBEE_SOUND_COUNT        15
 #define ZIGBEE_SOUND_ENDPOINT_BASE 1
@@ -193,7 +195,7 @@ void setLed(bool value) {
 Preferences Preferences;
 
 void setup() {
-    Serial.begin(115200);
+    DebugInit();
 
     Debug("Setup preferences");
     Preferences.begin("Volume", false);
