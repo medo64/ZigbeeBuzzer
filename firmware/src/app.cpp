@@ -216,6 +216,7 @@ void setup() {
         char description[16];
         snprintf(description, sizeof(description), "Sound %u", static_cast<unsigned>(endpointIndex));
         ZBSounds[i] = new ZigbeeBinary(ZIGBEE_SOUND_ENDPOINT_BASE + i);
+        ZBSounds[i]->setManufacturerAndModel("Medo64", "Buzzer");
         ZBSounds[i]->addBinaryOutput();
         ZBSounds[i]->setBinaryOutputDescription(description);
         switch(endpointIndex) {
@@ -238,7 +239,7 @@ void setup() {
         Zigbee.addEndpoint(ZBSounds[i]);
     }
 
-    ZBVolume.setManufacturerAndModel("Medo64", "Buzzer Volume");
+    ZBVolume.setManufacturerAndModel("Medo64", "Buzzer");
     ZBVolume.addAnalogOutput();
     ZBVolume.setAnalogOutputDescription("Volume");
     ZBVolume.setAnalogOutputMinMax(1, 3);
