@@ -13,9 +13,10 @@
 #define ZIGBEE_SOUND_ENDPOINT_BASE 1
 #define ZIGBEE_ANALOG_ENDPOINT   101
 
-#define BTN_BOOT BOOT_PIN
-#define BTN_USER 20
-#define LED_USER 15
+#define BTN_SYSTEM BOOT_PIN
+#define BTN_USER   20
+#define LED_SYSTEM 15
+#define LED_USER   19
 
 #define PWM_RESOLUTION 8
 
@@ -183,8 +184,9 @@ void setVolume(float value) {
     Debug("Volume set to %d", newValue);
 }
 
-void setUserLed(bool value) {
+void setLed(bool value) {
     digitalWrite(LED_USER, value ? LOW : HIGH);
+    digitalWrite(LED_SYSTEM, value ? LOW : HIGH);
 }
 
 
@@ -198,8 +200,10 @@ void setup() {
     PlayVolumeNext = Preferences.getUChar("Volume", 3);;
 
     Debug("Setup pins");
-    pinMode(LED_USER, OUTPUT);
+    pinMode(BTN_SYSTEM, INPUT_PULLUP);
     pinMode(BTN_USER, INPUT_PULLUP);
+    pinMode(LED_SYSTEM, OUTPUT);
+    pinMode(LED_USER, OUTPUT);
 
     Debug("Adding endpoints");
 
@@ -255,7 +259,7 @@ void setup() {
     while (!Zigbee.connected()) {
         delay(50);
         connectDuration = millis() - connectMillis;
-        setUserLed((connectDuration / 500) % 2 == 0);
+        setLed((connectDuration / 500) % 2 == 0);
     }
     if (connectDuration > 200) {  // assume the first connection
         queueTones("A43 B43 c53 D53 E53 f53 g53 A53");
@@ -264,7 +268,7 @@ void setup() {
 
     ZBVolume.setAnalogOutput((float)PlayVolumeNext);
 
-    setUserLed(false);
+    setLed(false);
 }
 
 
@@ -273,10 +277,10 @@ int64_t ButtonMillis = 0;
 void loop() {
     bool buttonPressed = digitalRead(BTN_USER) == LOW;
     if (buttonPressed && (ButtonMillis == 0)) {  // button pressed
-        setUserLed(true);
+        setLed(true);
         ButtonMillis = millis();
     } else if (!buttonPressed && (ButtonMillis != 0)) {  // button released
-        setUserLed(false);
+        setLed(false);
         uint64_t buttonDuration = millis() - ButtonMillis;
         ButtonMillis = 0;
         if ((buttonDuration >= 5000) && (buttonDuration <= 10000)) {
@@ -293,9 +297,9 @@ void loop() {
     } else if (buttonPressed) {  // button held
         uint64_t buttonDuration = millis() - ButtonMillis;
         if ((buttonDuration >= 5000) && (buttonDuration <= 10000)) {  // if held for 5-10, blink
-            setUserLed((buttonDuration / 200) % 2 == 0);
+            setLed((buttonDuration / 200) % 2 == 0);
         } else if (buttonDuration > 10000) {  // give up on waiting
-            setUserLed(true);
+            setLed(true);
         }
     }
 
