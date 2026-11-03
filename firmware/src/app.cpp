@@ -50,65 +50,9 @@ uint8_t PlayCounter = 0;
 ZigbeeBinary* ZBSounds[ZIGBEE_SOUND_COUNT] = {};
 ZigbeeAnalog ZBVolume(ZIGBEE_ANALOG_ENDPOINT);
 
-void queueTone(char noteChar, char octaveChar, char durationChar) {
-    uint8_t newPlayBufferEnd = PlayBufferEnd + 1;
-    if (PlayBufferEnd == newPlayBufferEnd) { return; }  // no buffer space
-
-    uint8_t octave;
-    if ((octaveChar >= '0') && (octaveChar <= '9')) {
-        octave = octaveChar - '0';
-    } else {
-        Debug("Unrecognized octave char '%c'", octaveChar);
-        return;
-    }
-
-    uint32_t frequency;
-    switch (noteChar) {
-        case 'C': frequency = Frequencies[octave * 12 + 0]; break;   // C
-        case 'c': frequency = Frequencies[octave * 12 + 1]; break;   // C#
-        case 'D': frequency = Frequencies[octave * 12 + 2]; break;   // D
-        case 'd': frequency = Frequencies[octave * 12 + 3]; break;   // D#
-        case 'E': frequency = Frequencies[octave * 12 + 4]; break;   // E
-        case 'F': frequency = Frequencies[octave * 12 + 5]; break;   // F
-        case 'f': frequency = Frequencies[octave * 12 + 6]; break;   // F#
-        case 'G': frequency = Frequencies[octave * 12 + 7]; break;   // G
-        case 'g': frequency = Frequencies[octave * 12 + 8]; break;   // G#
-        case 'A': frequency = Frequencies[octave * 12 + 9]; break;   // A
-        case 'a': frequency = Frequencies[octave * 12 + 10]; break;  // A#
-        case 'B': frequency = Frequencies[octave * 12 + 11]; break;  // B
-        case '0': frequency = 0; break;  // pause
-        default: Debug("Unrecognized note char '%c'", noteChar); return;
-    }
-
-    uint8_t hundredths;
-    switch (durationChar) {
-        case '0' : hundredths = 100; break;
-        case '1' : hundredths =  50; break;
-        case '2' : hundredths =  25; break;
-        case '3' : hundredths =  12; break;
-        case '4' : hundredths =   6; break;
-        case '5' : hundredths =   3; break;
-        case '6' : hundredths =   2; break;
-        case '7' : hundredths =   1; break;
-        default:
-            if ((durationChar >= 'A') && (durationChar <= 'Z')) {
-                hundredths = durationChar - 'A' + 1;
-            } else if ((durationChar >= 'a') && (durationChar <= 'z')) {
-                hundredths = durationChar - 'a' + 27;
-            } else {
-                Debug("Unrecognized duration char '%c'", durationChar);
-                return;
-            }
-            break;
-    }
-
-    PlayBufferFrequency[PlayBufferEnd] = frequency;
-    PlayBufferCounter[PlayBufferEnd] = hundredths;
-    PlayBufferEnd = newPlayBufferEnd;
-}
-
 void queueTones(char* chars) {
     std::lock_guard<std::mutex> guard(PlayMutex);
+
     while(true) {
         if (*chars == '\0') { break; }
 
@@ -127,31 +71,111 @@ void queueTones(char* chars) {
         char durationChar = *chars;
         chars++;
 
-        queueTone(noteChar, octaveChar, durationChar);
+        uint8_t newPlayBufferEnd = PlayBufferEnd + 1;
+        if (PlayBufferEnd == newPlayBufferEnd) {
+            Debug("Buffer exhausted!");
+            return;
+        }
+
+        uint8_t octave;
+        if ((octaveChar >= '0') && (octaveChar <= '9')) {
+            octave = octaveChar - '0';
+        } else {
+            Debug("Unrecognized octave char '%c'!", octaveChar);
+            return;
+        }
+
+        uint32_t frequency;
+        switch (noteChar) {
+            case 'C': frequency = Frequencies[octave * 12 + 0]; break;   // C
+            case 'c': frequency = Frequencies[octave * 12 + 1]; break;   // C#
+            case 'D': frequency = Frequencies[octave * 12 + 2]; break;   // D
+            case 'd': frequency = Frequencies[octave * 12 + 3]; break;   // D#
+            case 'E': frequency = Frequencies[octave * 12 + 4]; break;   // E
+            case 'F': frequency = Frequencies[octave * 12 + 5]; break;   // F
+            case 'f': frequency = Frequencies[octave * 12 + 6]; break;   // F#
+            case 'G': frequency = Frequencies[octave * 12 + 7]; break;   // G
+            case 'g': frequency = Frequencies[octave * 12 + 8]; break;   // G#
+            case 'A': frequency = Frequencies[octave * 12 + 9]; break;   // A
+            case 'a': frequency = Frequencies[octave * 12 + 10]; break;  // A#
+            case 'B': frequency = Frequencies[octave * 12 + 11]; break;  // B
+            case '0': frequency = 0; break;  // pause
+            default: Debug("Unrecognized note char '%c'!", noteChar); return;
+        }
+
+        uint8_t hundredths;
+        switch (durationChar) {
+            case '0' : hundredths = 100; break;
+            case '1' : hundredths =  50; break;
+            case '2' : hundredths =  25; break;
+            case '3' : hundredths =  12; break;
+            case '4' : hundredths =   6; break;
+            case '5' : hundredths =   3; break;
+            case '6' : hundredths =   2; break;
+            case '7' : hundredths =   1; break;
+            default:
+                if ((durationChar >= 'A') && (durationChar <= 'Z')) {
+                    hundredths = durationChar - 'A' + 1;
+                } else if ((durationChar >= 'a') && (durationChar <= 'z')) {
+                    hundredths = durationChar - 'a' + 27;
+                } else {
+                    Debug("Unrecognized duration char '%c'!", durationChar);
+                    return;
+                }
+                break;
+        }
+
+        PlayBufferFrequency[PlayBufferEnd] = frequency;
+        PlayBufferCounter[PlayBufferEnd] = hundredths;
+        PlayBufferEnd = newPlayBufferEnd;
+
         Debug("Queued %c%c%c", noteChar, octaveChar, durationChar);
     }
+
+    PlayBufferFrequency[PlayBufferEnd] = 0;
+    PlayBufferCounter[PlayBufferEnd] = 10; // 100ms
+    PlayBufferEnd++;
+    Debug("Queued a moment of silence");
+
     Debug("Queuing done");
 }
 
-void playSound1(bool state) { if (state) { queueTones("A43"); } }
-void playSound2(bool state) { if (state) { queueTones("E42"); } }
-void playSound3(bool state) { if (state) { queueTones("C52"); } }
+void playSound(uint8_t index) {
+    Debug("Sound %d triggered", index)
+    switch (index) {
+        case  1: queueTones("A43"); break;
+        case  2: queueTones("E42"); break;
+        case  3: queueTones("C52"); break;
+        case  4: queueTones("A42 C53"); break;
+        case  5: queueTones("C52 E52"); break;
+        case  6: queueTones("F41 A42"); break;
+        case  7: queueTones("A42 g42 A42"); break;
+        case  8: queueTones("D42 F42 A52"); break;
+        case  9: queueTones("G51 E52 C53"); break;
+        case 10: queueTones("C52 E53 G52 C63"); break;
+        case 11: queueTones("C42 G42 E52 g52"); break;
+        case 12: queueTones("C41 E41 A41 B41"); break;
+        case 13: queueTones("B4Y G4y D4Y E4Y C4y"); break;
+        case 14: queueTones("G5O G5O A5O B5O C6e"); break;
+        case 15: queueTones("B5R B5R A5R g5R f5R E5e"); break;
+    }
+}
 
-void playSound4(bool state) { if (state) { queueTones("A42 C53"); } }
-void playSound5(bool state) { if (state) { queueTones("C52 E52"); } }
-void playSound6(bool state) { if (state) { queueTones("F41 A42"); } }
-
-void playSound7(bool state) { if (state) { queueTones("A42 g42 A42"); } }
-void playSound8(bool state) { if (state) { queueTones("D42 F42 A52"); } }
-void playSound9(bool state) { if (state) { queueTones("G51 E52 C53"); } }
-
-void playSound10(bool state) { if (state) { queueTones("C52 E53 G52 C63"); } }
-void playSound11(bool state) { if (state) { queueTones("C42 G42 E52 g52"); } }
-void playSound12(bool state) { if (state) { queueTones("C41 E41 A41 B41"); } }
-
-void playSound13(bool state) { if (state) { queueTones("B4Y G4y D4Y E4Y C4y"); } }
-void playSound14(bool state) { if (state) { queueTones("G5O G5O A5O B5O C6e"); } }
-void playSound15(bool state) { if (state) { queueTones("B5R B5R A5R g5R f5R E5e"); } }
+void playSound1(bool state) { if (state) { playSound(1); } }
+void playSound2(bool state) { if (state) { playSound(2); } }
+void playSound3(bool state) { if (state) { playSound(3); } }
+void playSound4(bool state) { if (state) { playSound(4); } }
+void playSound5(bool state) { if (state) { playSound(5); } }
+void playSound6(bool state) { if (state) { playSound(6); } }
+void playSound7(bool state) { if (state) { playSound(7); } }
+void playSound8(bool state) { if (state) { playSound(8); } }
+void playSound9(bool state) { if (state) { playSound(9); } }
+void playSound10(bool state) { if (state) { playSound(10); } }
+void playSound11(bool state) { if (state) { playSound(11); } }
+void playSound12(bool state) { if (state) { playSound(12); } }
+void playSound13(bool state) { if (state) { playSound(13); } }
+void playSound14(bool state) { if (state) { playSound(14); } }
+void playSound15(bool state) { if (state) { playSound(15); } }
 
 void setVolume(float value) {
     uint8_t newValue = (uint8_t)value;
@@ -284,14 +308,16 @@ void loop() {
             Debug("Play %d Hz for %d0 ms (%d:%d)", frequency, hundredths, PlayBufferStart, PlayBufferEnd);
             PlayCounter = hundredths;
 
+            uint8_t newDutyCycle = (frequency > 0) ? 50 : 0;
+            uint32_t newFrequency = (frequency > 0) ? frequency : 1000;
+
             if (PlayVolume == PlayVolumeNext) {  // use  the same PWM
                 Debug("Play changing frequency for PWM %d", PlayVolume);
                 switch (PlayVolume) {
-                    case 1: ledcChangeFrequency(PWM_1_PIN, frequency, PWM_RESOLUTION); break;
-                    case 2: ledcChangeFrequency(PWM_2_PIN, frequency, PWM_RESOLUTION); break;
-                    case 3: ledcChangeFrequency(PWM_3_PIN, frequency, PWM_RESOLUTION); break;
+                    case 1: ledcChangeFrequency(PWM_1_PIN, newFrequency, PWM_RESOLUTION); break;
+                    case 2: ledcChangeFrequency(PWM_2_PIN, newFrequency, PWM_RESOLUTION); break;
+                    case 3: ledcChangeFrequency(PWM_3_PIN, newFrequency, PWM_RESOLUTION); break;
                 }
-
             } else {  // there was a change in play volume
                 if (PlayVolume > 0) {  // volume already exists
                     Debug("Play detaching PWM %d", PlayVolume);
@@ -304,23 +330,20 @@ void loop() {
                 PlayVolume = PlayVolumeNext;
                 Debug("Play attaching PWM %d", PlayVolume);
                 switch (PlayVolume) {
-                    case 1: ledcAttach(PWM_1_PIN, frequency, PWM_RESOLUTION); break;
-                    case 2: ledcAttach(PWM_2_PIN, frequency, PWM_RESOLUTION); break;
-                    case 3: ledcAttach(PWM_3_PIN, frequency, PWM_RESOLUTION); break;
+                    case 1: ledcAttach(PWM_1_PIN, newFrequency, PWM_RESOLUTION); break;
+                    case 2: ledcAttach(PWM_2_PIN, newFrequency, PWM_RESOLUTION); break;
+                    case 3: ledcAttach(PWM_3_PIN, newFrequency, PWM_RESOLUTION); break;
                 }
                 Preferences.putUChar("Volume", PlayVolume);
-                PlayActive = false;
             }
 
-            if (!PlayActive) {
-                Debug("Play setting duty cycle for PWM %d", PlayVolume);
-                switch (PlayVolume) {
-                    case 1: ledcWrite(PWM_1_PIN, 50); break;
-                    case 2: ledcWrite(PWM_2_PIN, 50); break;
-                    case 3: ledcWrite(PWM_3_PIN, 50); break;
-                }
-                PlayActive = true;
+            Debug("Play setting duty cycle for PWM %d", PlayVolume);
+            switch (PlayVolume) {
+                case 1: ledcWrite(PWM_1_PIN, newDutyCycle); break;
+                case 2: ledcWrite(PWM_2_PIN, newDutyCycle); break;
+                case 3: ledcWrite(PWM_3_PIN, newDutyCycle); break;
             }
+            PlayActive = true;
             PlayBufferStart += 1;
 
         } else if (PlayActive) {  // done with playing
