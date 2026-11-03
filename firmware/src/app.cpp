@@ -9,8 +9,8 @@
 #define Debug(...) if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
 
 
-#define ZIGBEE_SWITCH_ENDPOINT_1 1
-#define ZIGBEE_SWITCH_ENDPOINT_2 2
+#define ZIGBEE_SOUND_COUNT         3
+#define ZIGBEE_SOUND_ENDPOINT_BASE 1
 #define ZIGBEE_ANALOG_ENDPOINT 101
 
 #define BTN_BOOT BOOT_PIN
@@ -47,11 +47,8 @@ uint8_t PlayBufferStart = 0;
 uint8_t PlayBufferEnd = 0;
 uint8_t PlayCounter = 0;
 
-
-ZigbeePowerOutlet ZBSwitch1(ZIGBEE_SWITCH_ENDPOINT_1);
-ZigbeePowerOutlet  ZBSwitch2(ZIGBEE_SWITCH_ENDPOINT_2);
+ZigbeeBinary* ZBSounds[3] = {};
 ZigbeeAnalog ZBVolume(ZIGBEE_ANALOG_ENDPOINT);
-
 
 void queueTone(char noteChar, char octaveChar, char durationChar) {
     uint8_t newPlayBufferEnd = PlayBufferEnd + 1;
@@ -136,23 +133,9 @@ void queueTones(char* chars) {
     Debug("Queuing done");
 }
 
-void setState1(bool value) {
-    if (value) {
-        Debug("Switch 1 on");
-        queueTones("A42 g42 A42");
-    } else {
-        Debug("Switch 1 off");
-    }
-}
-
-void setState2(bool value) {
-    if (value) {
-        Debug("Switch 2 on");
-        queueTones("E42 f42 E42");
-    } else {
-        Debug("Switch 2 off");
-    }
-}
+void playSound1(bool state) { if (state) { queueTones("A41"); } }
+void playSound2(bool state) { if (state) { queueTones("A42 g42 A42"); } }
+void playSound3(bool state) { if (state) { queueTones("E42 f42 E42"); } }
 
 void setVolume(float value) {
     uint8_t newValue = (uint8_t)value;
@@ -180,13 +163,19 @@ void setup() {
 
     Debug("Adding endpoints");
 
-    ZBSwitch1.setManufacturerAndModel("Medo64", "Buzzer Switch 1");
-    ZBSwitch1.onPowerOutletChange(setState1);
-    Zigbee.addEndpoint(&ZBSwitch1);
-
-    ZBSwitch2.setManufacturerAndModel("Medo64", "Buzzer Switch 2");
-    ZBSwitch2.onPowerOutletChange(setState2);
-    Zigbee.addEndpoint(&ZBSwitch2);
+    for (size_t i = 0; i < ZIGBEE_SOUND_COUNT; i++) {
+        char description[16];
+        snprintf(description, sizeof(description), "Sound %u", static_cast<unsigned>(i + 1));
+        ZBSounds[i] = new ZigbeeBinary(ZIGBEE_SOUND_ENDPOINT_BASE + i);
+        ZBSounds[i]->addBinaryOutput();
+        ZBSounds[i]->setBinaryOutputDescription(description);
+        switch(i) {
+            case 0: ZBSounds[i]->onBinaryOutputChange(playSound1); break;
+            case 1: ZBSounds[i]->onBinaryOutputChange(playSound2); break;
+            case 2: ZBSounds[i]->onBinaryOutputChange(playSound3); break;
+        }
+        Zigbee.addEndpoint(ZBSounds[i]);
+    }
 
     ZBVolume.setManufacturerAndModel("Medo64", "Buzzer Volume");
     ZBVolume.addAnalogOutput();
@@ -322,6 +311,7 @@ void loop() {
         delay(10);
     }
 
-    if (ZBSwitch1.getPowerOutletState()) { Debug("Switch 1 to off"); ZBSwitch1.setState(false); }
-    if (ZBSwitch2.getPowerOutletState()) { Debug("Switch 2 to off"); ZBSwitch2.setState(false); }
+    for (size_t i = 0; i < ZIGBEE_SOUND_COUNT; i++) {
+        if (ZBSounds[i]->getBinaryOutput()) { ZBSounds[i]->setBinaryOutput(false); }
+    }
 }
