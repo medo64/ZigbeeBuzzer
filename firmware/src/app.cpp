@@ -9,9 +9,9 @@
 #define Debug(...) if (Serial) { Serial.printf(__VA_ARGS__); Serial.println(); }
 
 
-#define ZIGBEE_SOUND_COUNT         3
+#define ZIGBEE_SOUND_COUNT        15
 #define ZIGBEE_SOUND_ENDPOINT_BASE 1
-#define ZIGBEE_ANALOG_ENDPOINT 101
+#define ZIGBEE_ANALOG_ENDPOINT   101
 
 #define BTN_BOOT BOOT_PIN
 #define BTN_USER 20
@@ -47,7 +47,7 @@ uint8_t PlayBufferStart = 0;
 uint8_t PlayBufferEnd = 0;
 uint8_t PlayCounter = 0;
 
-ZigbeeBinary* ZBSounds[3] = {};
+ZigbeeBinary* ZBSounds[ZIGBEE_SOUND_COUNT] = {};
 ZigbeeAnalog ZBVolume(ZIGBEE_ANALOG_ENDPOINT);
 
 void queueTone(char noteChar, char octaveChar, char durationChar) {
@@ -133,9 +133,25 @@ void queueTones(char* chars) {
     Debug("Queuing done");
 }
 
-void playSound1(bool state) { if (state) { queueTones("A41"); } }
-void playSound2(bool state) { if (state) { queueTones("A42 g42 A42"); } }
-void playSound3(bool state) { if (state) { queueTones("E42 f42 E42"); } }
+void playSound1(bool state) { if (state) { queueTones("A43"); } }
+void playSound2(bool state) { if (state) { queueTones("E42"); } }
+void playSound3(bool state) { if (state) { queueTones("C52"); } }
+
+void playSound4(bool state) { if (state) { queueTones("A42 C53"); } }
+void playSound5(bool state) { if (state) { queueTones("C52 E52"); } }
+void playSound6(bool state) { if (state) { queueTones("F41 A42"); } }
+
+void playSound7(bool state) { if (state) { queueTones("A42 g42 A42"); } }
+void playSound8(bool state) { if (state) { queueTones("D42 F42 A52"); } }
+void playSound9(bool state) { if (state) { queueTones("G51 E52 C53"); } }
+
+void playSound10(bool state) { if (state) { queueTones("C52 E53 G52 C63"); } }
+void playSound11(bool state) { if (state) { queueTones("C42 G42 E52 g52"); } }
+void playSound12(bool state) { if (state) { queueTones("C41 E41 A41 B41"); } }
+
+void playSound13(bool state) { if (state) { queueTones("B4Y G4y D4Y E4Y C4y"); } }
+void playSound14(bool state) { if (state) { queueTones("G5O G5O A5O B5O C6e"); } }
+void playSound15(bool state) { if (state) { queueTones("B5R B5R A5R g5R f5R E5e"); } }
 
 void setVolume(float value) {
     uint8_t newValue = (uint8_t)value;
@@ -166,15 +182,28 @@ void setup() {
     Zigbee.role(ZIGBEE_END_DEVICE);
 
     for (size_t i = 0; i < ZIGBEE_SOUND_COUNT; i++) {
+        uint8_t endpointIndex = i + 1;
         char description[16];
-        snprintf(description, sizeof(description), "Sound %u", static_cast<unsigned>(i + 1));
+        snprintf(description, sizeof(description), "Sound %u", static_cast<unsigned>(endpointIndex));
         ZBSounds[i] = new ZigbeeBinary(ZIGBEE_SOUND_ENDPOINT_BASE + i);
         ZBSounds[i]->addBinaryOutput();
         ZBSounds[i]->setBinaryOutputDescription(description);
-        switch(i) {
-            case 0: ZBSounds[i]->onBinaryOutputChange(playSound1); break;
-            case 1: ZBSounds[i]->onBinaryOutputChange(playSound2); break;
-            case 2: ZBSounds[i]->onBinaryOutputChange(playSound3); break;
+        switch(endpointIndex) {
+            case  1: ZBSounds[i]->onBinaryOutputChange(playSound1); break;
+            case  2: ZBSounds[i]->onBinaryOutputChange(playSound2); break;
+            case  3: ZBSounds[i]->onBinaryOutputChange(playSound3); break;
+            case  4: ZBSounds[i]->onBinaryOutputChange(playSound4); break;
+            case  5: ZBSounds[i]->onBinaryOutputChange(playSound5); break;
+            case  6: ZBSounds[i]->onBinaryOutputChange(playSound6); break;
+            case  7: ZBSounds[i]->onBinaryOutputChange(playSound7); break;
+            case  8: ZBSounds[i]->onBinaryOutputChange(playSound8); break;
+            case  9: ZBSounds[i]->onBinaryOutputChange(playSound9); break;
+            case 10: ZBSounds[i]->onBinaryOutputChange(playSound10); break;
+            case 11: ZBSounds[i]->onBinaryOutputChange(playSound11); break;
+            case 12: ZBSounds[i]->onBinaryOutputChange(playSound12); break;
+            case 13: ZBSounds[i]->onBinaryOutputChange(playSound13); break;
+            case 14: ZBSounds[i]->onBinaryOutputChange(playSound14); break;
+            case 15: ZBSounds[i]->onBinaryOutputChange(playSound15); break;
         }
         Zigbee.addEndpoint(ZBSounds[i]);
     }
